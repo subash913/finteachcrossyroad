@@ -12,27 +12,179 @@ let lanes;
 let gameSounds, themeSong;
 let gameOver;
 
-function showNotification(message) {
+const updateHighScore = (currentScore) => {
+    let highScore = parseInt(localStorage.getItem('highScore'));
+    if (currentScore > highScore) {
+        localStorage.setItem('highScore', currentScore.toString());
+        document.getElementById("highScore").innerText = "HIGH SCORE:" + currentScore;
+    }
+}
+
+let currentQuestionIndex = -1;
+
+const initializeHighScore = () => {
+    if (localStorage.getItem('highScore') === null) {
+        localStorage.setItem('highScore', '0');
+    }
+    document.getElementById("highScore").innerText = "HIGH SCORE:" + localStorage.getItem('highScore');
+}
+
+document.addEventListener('keydown', handleKeyPress);
+function handleKeyPress(event) {
+    if (currentQuestionIndex !== -1) {
+        const key = event.key.toUpperCase(); // Convert the key to uppercase to match the answers format
+        if (['A', 'B', 'C', 'D'].includes(key)) {
+            checkAnswer(key);
+        } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            if (chicken.isFrozen) {
+                showFeedback('You cannot move until you answer the question.');
+            }
+        }
+    }
+}
+
+function showFeedback(message) {
+    const feedback = document.getElementById('feedback');
+    feedback.textContent = message;
+    feedback.style.display = 'block';
+
+    setTimeout(() => {
+        feedback.style.display = 'none';
+    }, 2000); // Adjust delay as needed
+}
+
+
+
+function checkAnswer(key) {
+    const correctAnswer = answers[currentQuestionIndex];
+    if (key === correctAnswer) {
+        showFeedback('Correct!');
+    } else {
+        showFeedback('Incorrect!');
+        // Handle chicken death on incorrect answer
+        if (!gameOver) {
+            chicken.squish();
+            gameSounds.themeSong.setVolume(0);
+            gameSounds.hit.play();
+            gameOver = true;
+            setTimeout(() => {
+                document.getElementById("restart").style.visibility = "visible";
+            }, 2000); // Adjust delay as needed
+            Chicken.questionAskedLane = -1
+            updateHighScore(chicken.currentLane);  // Update high score
+        }
+    }
+    // Hide the notification after checking the answer
+    setTimeout(hideNotification, 2000); // Adjust delay as needed
+}
+
+
+
+
+
+
+
+function freezeChicken() {
+    if (chicken) {
+        chicken.isFrozen = true;
+    }
+}
+
+function unfreezeChicken() {
+    if (chicken) {
+        chicken.isFrozen = false;
+    }
+}
+
+
+const questions = [
+    {
+      question: "What color is the sky on a clear day?",
+      choices: ["A. Green", "B. Blue", "C. Red", "D. Yellow"]
+    },
+    {
+      question: "How many legs does a spider have?",
+      choices: ["A. Four", "B. Six", "C. Eight", "D. Ten"]
+    },
+    {
+      question: "Which of these is a fruit?",
+      choices: ["A. Carrot", "B. Banana", "C. Lettuce", "D. Broccoli"]
+    },
+    {
+      question: "What sound does a cow make?",
+      choices: ["A. Meow", "B. Quack", "C. Moo", "D. Baa"]
+    },
+    {
+      question: "How many days are there in a week?",
+      choices: ["A. Five", "B. Six", "C. Seven", "D. Eight"]
+    },
+    {
+      question: "What is 2 + 2?",
+      choices: ["A. 3", "B. 4", "C. 5", "D. 6"]
+    },
+    {
+      question: "Which of these animals can fly?",
+      choices: ["A. Dog", "B. Bird", "C. Fish", "D. Cat"]
+    },
+    {
+      question: "What color are bananas when they are ripe?",
+      choices: ["A. Red", "B. Blue", "C. Yellow", "D. Purple"]
+    },
+    {
+      question: "What do you use to brush your teeth?",
+      choices: ["A. Hairbrush", "B. Toothbrush", "C. Comb", "D. Spoon"]
+    },
+    {
+      question: "Which season is the coldest?",
+      choices: ["A. Spring", "B. Summer", "C. Fall", "D. Winter"]
+    }
+  ];
+  
+  const answers = ["B", "C", "B", "C", "C", "B", "B", "C", "B", "D"];
+  
+
+  function showNotification() {
+    if (currentQuestionIndex === -1) {
+        // Get a random question index
+        currentQuestionIndex = Math.floor(Math.random() * questions.length);
+    }
+
+    // Get the current question
+    const currentQuestion = questions[currentQuestionIndex];
+
+    // Create the message with the question and choices
+    const message = `${currentQuestion.question}<br>${currentQuestion.choices.join('<br>')}`;
+
+    // Display the notification
     const notification = document.getElementById('notification');
-    notification.textContent = message;
+    notification.innerHTML = message; // Use innerHTML to interpret <br> tags
     notification.style.display = 'block';
 
-    // Hide the notification after a delay
-    setTimeout(() => {
-        notification.style.display = 'none';
-    }, 2000); // Adjust delay as needed (e.g., 2000 milliseconds = 2 seconds)
+    // Freeze the chicken
+    freezeChicken();
+
+    // Set the questionAskedLane to the current lane index
+    chicken.questionAskedLane = chicken.getLane();
 }
+
+
 
 function hideNotification() {
     const notification = document.getElementById('notification');
     notification.style.display = 'none';
+    unfreezeChicken(); // Unfreeze the chicken when hiding the notification
+    currentQuestionIndex = -1; // Reset the question index
 }
+
+
+
 
 const firstRun = () =>{
     document.getElementById("instructions").innerText = ((/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) ? "Everytime you get to grass you will be asked a financial literacy question." : "Everytime you get to grass you will be asked a financial literacy question.") + "\nPress the corresponding letter on your keyboard.";
     stats = new Stats();
     stats.showPanel(0);
     //document.body.appendChild(stats.dom);
+    initializeHighScore();
 
     camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 15, 18);
@@ -122,6 +274,9 @@ class Chicken{
         this.feathers = new Feathers();
         this.splashes = new Splash();
         //this.model.add(gameSounds.buck);
+        this.isFrozen = false;
+        this.questionAskedLane = -1;
+
 
         let red = new THREE.MeshLambertMaterial({color: 0xdc5a5a}),
             white = new THREE.MeshLambertMaterial({color: 0xffffff}),
@@ -199,7 +354,7 @@ class Chicken{
     }
 
     jump(direction){
-        if (!this.isMoving && !gameOver){
+        if (!this.isMoving &&!this.isFrozen && !gameOver){
             let duration = 0.4;
             let dX = 0, dY = 1, dZ = 0;
             let currentX = -columns/2 * cellWidth + cellWidth/2 + this.currentColumn * cellWidth;
@@ -1083,13 +1238,12 @@ class Sound{
     }
 }
 
-//game loop
 const update = () => {
     stats.begin();
     deltaTime = clock.getDelta();
 
-    if(chicken){
-        //animations
+    if (chicken) {
+        // animations
         if (chicken.jumpAnimation && chicken.jumpAnimation.mixer)
             chicken.jumpAnimation.mixer.update(chicken.jumpAnimation.clock.getDelta());
         if (chicken.sizeAnimation && chicken.sizeAnimation.mixer && !gameOver)
@@ -1098,134 +1252,131 @@ const update = () => {
             chicken.heightAnimation.mixer.update(chicken.heightAnimation.clock.getDelta());
         if (chicken.fallAnimation && chicken.fallAnimation.mixer)
             chicken.fallAnimation.mixer.update(chicken.fallAnimation.clock.getDelta());
-        chicken.feathers.animations.forEach((animation, index) =>{
-            if(animation && animation.mixer){
+        chicken.feathers.animations.forEach((animation, index) => {
+            if (animation && animation.mixer) {
                 animation.mixer.update(animation.clock.getDelta());
                 if (animation.mixer.time > animation.firstInterval)
                     chicken.feathers.feathers[index].rotation.x += animation.rotationSpeed * deltaTime;
             }
         });
-        chicken.splashes.animations.forEach(animation =>{
-            if(animation && animation.mixer)
+        chicken.splashes.animations.forEach(animation => {
+            if (animation && animation.mixer)
                 animation.mixer.update(animation.clock.getDelta());
         });
 
-        //makes camera follow player
+        // makes camera follow player
         camera.position.x = chicken.model.position.x + cameraOffsetX;
         camera.position.z = chicken.model.position.z + cameraOffsetZ;
     }
 
-    if(lanes){
-        //moves vehicles and logs in field of view and checks collision with chicken
+    if (lanes) {
+        // moves vehicles and logs in field of view and checks collision with chicken
         lanes.filter(lane => lane.index >= chicken.getLane() - 9 && lane.index <= chicken.getLane() + 9).forEach(lane => {
-            if (lane.type == 'car'){
-                const leftPos = -columns/2 * cellWidth + cellWidth/2 - 2 * cellWidth;
+            if (lane.type == 'car') {
+                const leftPos = -columns / 2 * cellWidth + cellWidth / 2 - 2 * cellWidth;
                 const rightPos = -leftPos;
                 lane.vehicles.forEach(car => {
-                    if(lane.direction) {
-                        car.position.x = car.position.x > rightPos? leftPos : car.position.x + lane.speed * deltaTime;
-                    }else{
-                        car.position.x = car.position.x < leftPos? rightPos : car.position.x - lane.speed * deltaTime;
+                    if (lane.direction) {
+                        car.position.x = car.position.x > rightPos ? leftPos : car.position.x + lane.speed * deltaTime;
+                    } else {
+                        car.position.x = car.position.x < leftPos ? rightPos : car.position.x - lane.speed * deltaTime;
                     }
-                    const carLeftEdge = car.position.x + (lane.direction? (-cellWidth * 1.5) : (-cellWidth * 0.5));
-                    const carRightEdge = car.position.x + (lane.direction? (cellWidth * 0.5) : (cellWidth * 1.5));
-                    const chickenLeftEdge = chicken.model.position.x - cellWidth/2 * 0.2;
-                    const chickenRightEdge = chicken.model.position.x + cellWidth/2 * 0.2;
-                    if(chickenRightEdge > carLeftEdge && chickenLeftEdge < carRightEdge && chicken.getLane() == lane.index){
-                        if (!gameOver){
+                    const carLeftEdge = car.position.x + (lane.direction ? (-cellWidth * 1.5) : (-cellWidth * 0.5));
+                    const carRightEdge = car.position.x + (lane.direction ? (cellWidth * 0.5) : (cellWidth * 1.5));
+                    const chickenLeftEdge = chicken.model.position.x - cellWidth / 2 * 0.2;
+                    const chickenRightEdge = chicken.model.position.x + cellWidth / 2 * 0.2;
+                    if (chickenRightEdge > carLeftEdge && chickenLeftEdge < carRightEdge && chicken.getLane() == lane.index) {
+                        if (!gameOver) {
                             chicken.squish();
                             gameSounds.themeSong.setVolume(0);
                             gameSounds.hit.play();
                             gameOver = true;
                             setTimeout(() => {
                                 document.getElementById("restart").style.visibility = "visible";
-                                // if (confirm("Game Over.\nRestart?"))
-                                //     init();
                             }, 2000);
+                            Chicken.questionAskedLane = -1
+            updateHighScore(chicken.currentLane); 
                         }
                     }
                 });
-            }
-            else if (lane.type == 'truck'){
-                const leftPos = -columns/2 * cellWidth + cellWidth/2 - 3 * cellWidth;
+            } else if (lane.type == 'truck') {
+                const leftPos = -columns / 2 * cellWidth + cellWidth / 2 - 3 * cellWidth;
                 const rightPos = -leftPos;
                 lane.vehicles.forEach(truck => {
-                    if(lane.direction) {
-                        truck.position.x = truck.position.x > rightPos? leftPos : truck.position.x + lane.speed * deltaTime;
-                    }else{
-                        truck.position.x = truck.position.x < leftPos? rightPos : truck.position.x - lane.speed * deltaTime;
+                    if (lane.direction) {
+                        truck.position.x = truck.position.x > rightPos ? leftPos : truck.position.x + lane.speed * deltaTime;
+                    } else {
+                        truck.position.x = truck.position.x < leftPos ? rightPos : truck.position.x - lane.speed * deltaTime;
                     }
-                    const truckLeftEdge = truck.position.x + (lane.direction? (-cellWidth * 2.5) : (-cellWidth * 0.5));
-                    const truckRightEdge = truck.position.x + (lane.direction? (cellWidth * 0.5) : (cellWidth * 2.5));
-                    const chickenLeftEdge = chicken.model.position.x - cellWidth/2 * 0.2;
-                    const chickenRightEdge = chicken.model.position.x + cellWidth/2 * 0.2;
-                    if(chickenRightEdge > truckLeftEdge && chickenLeftEdge < truckRightEdge && chicken.getLane() == lane.index){
-                        if (!gameOver){
+                    const truckLeftEdge = truck.position.x + (lane.direction ? (-cellWidth * 2.5) : (-cellWidth * 0.5));
+                    const truckRightEdge = truck.position.x + (lane.direction ? (cellWidth * 0.5) : (cellWidth * 2.5));
+                    const chickenLeftEdge = chicken.model.position.x - cellWidth / 2 * 0.2;
+                    const chickenRightEdge = chicken.model.position.x + cellWidth / 2 * 0.2;
+                    if (chickenRightEdge > truckLeftEdge && chickenLeftEdge < truckRightEdge && chicken.getLane() == lane.index) {
+                        if (!gameOver) {
                             chicken.squish();
                             gameSounds.themeSong.setVolume(0);
                             gameSounds.hit.play();
                             gameOver = true;
                             setTimeout(() => {
                                 document.getElementById("restart").style.visibility = "visible";
-                                // if (confirm("Game Over.\nRestart?"))
-                                //     init();
                             }, 3000);
+                            Chicken.questionAskedLane = -1
+            updateHighScore(chicken.currentLane); 
                         }
                     }
                 });
-            }
-            else if (lane.type == 'river'){
-                const leftPos = -columns/2 * cellWidth + cellWidth/2 - 2 * cellWidth;
+            } else if (lane.type == 'river') {
+                const leftPos = -columns / 2 * cellWidth + cellWidth / 2 - 2 * cellWidth;
                 const rightPos = -leftPos;
                 let logsBelowChicken = 0;
                 lane.logs.forEach(log => {
-                    if(lane.direction) {
-                        log.position.x = log.position.x > rightPos? leftPos : log.position.x + lane.speed * deltaTime;
-                    }else{
-                        log.position.x = log.position.x < leftPos? rightPos : log.position.x - lane.speed * deltaTime;
+                    if (lane.direction) {
+                        log.position.x = log.position.x > rightPos ? leftPos : log.position.x + lane.speed * deltaTime;
+                    } else {
+                        log.position.x = log.position.x < leftPos ? rightPos : log.position.x - lane.speed * deltaTime;
                     }
-                    const logLeftEdge = log.position.x + (lane.direction? (-cellWidth * 1.5) : (-cellWidth * 0.5));
-                    const logRightEdge = log.position.x + (lane.direction? (cellWidth * 0.5) : (cellWidth * 1.5));
-                    const chickenLeftEdge = chicken.model.position.x - cellWidth/2 * 0.2;
-                    const chickenRightEdge = chicken.model.position.x + cellWidth/2 * 0.2;
-                    const farLeft = -columns/2 * cellWidth;
-                    const farRight = columns/2 * cellWidth;
-                    if(chickenRightEdge > logLeftEdge && chickenLeftEdge < logRightEdge && chicken.getLane() == lane.index && chicken.isMoving == false && !gameOver){
+                    const logLeftEdge = log.position.x + (lane.direction ? (-cellWidth * 1.5) : (-cellWidth * 0.5));
+                    const logRightEdge = log.position.x + (lane.direction ? (cellWidth * 0.5) : (cellWidth * 1.5));
+                    const chickenLeftEdge = chicken.model.position.x - cellWidth / 2 * 0.2;
+                    const chickenRightEdge = chicken.model.position.x + cellWidth / 2 * 0.2;
+                    const farLeft = -columns / 2 * cellWidth;
+                    const farRight = columns / 2 * cellWidth;
+                    if (chickenRightEdge > logLeftEdge && chickenLeftEdge < logRightEdge && chicken.getLane() == lane.index && chicken.isMoving == false && !gameOver) {
                         logsBelowChicken++;
-                        chicken.currentColumn = Math.floor((chicken.model.position.x + columns/2 * cellWidth)/cellWidth);
+                        chicken.currentColumn = Math.floor((chicken.model.position.x + columns / 2 * cellWidth) / cellWidth);
                         if (chicken.currentColumn >= columns)
                             chicken.currentColumn = columns - 1;
                         if (chicken.currentColumn < 0)
                             chicken.currentColumn = 0;
                         if (chickenRightEdge < farRight && chickenLeftEdge > farLeft)
-                            chicken.model.position.x += lane.direction? lane.speed * deltaTime : -lane.speed * deltaTime;
+                            chicken.model.position.x += lane.direction ? lane.speed * deltaTime : -lane.speed * deltaTime;
                     }
                 });
-                if(logsBelowChicken == 0 && chicken.getLane() == lane.index && chicken.isMoving == false){
-                    if (!gameOver){
+                if (logsBelowChicken == 0 && chicken.getLane() == lane.index && chicken.isMoving == false) {
+                    if (!gameOver) {
                         chicken.fall();
                         gameOver = true;
                         setTimeout(() => {
                             document.getElementById("restart").style.visibility = "visible";
-                            // if (confirm("Game Over.\nRestart?"))
-                            //     init();
                         }, 2000);
+                        Chicken.questionAskedLane = -1
+            updateHighScore(chicken.currentLane); 
                     }
                 }
-            }
-            else if (lane.type == 'rail'){
-                if(lane.direction){
-                    lane.train.position.x = ((lane.train.position.x > lane.finalPosition)? lane.initialPosition : (lane.train.position.x + lane.speed * deltaTime));
-                } else{
-                    lane.train.position.x = ((lane.train.position.x < lane.finalPosition)? lane.initialPosition : (lane.train.position.x - lane.speed * deltaTime));
+            } else if (lane.type == 'rail') {
+                if (lane.direction) {
+                    lane.train.position.x = ((lane.train.position.x > lane.finalPosition) ? lane.initialPosition : (lane.train.position.x + lane.speed * deltaTime));
+                } else {
+                    lane.train.position.x = ((lane.train.position.x < lane.finalPosition) ? lane.initialPosition : (lane.train.position.x - lane.speed * deltaTime));
                 }
                 const trainLength = 4 * cellWidth * lane.trainLength;
-                const trainLeftEdge = lane.train.position.x + (lane.direction? -(trainLength - cellWidth * 0.5) : -(cellWidth * 0.5));
-                const trainRightEdge = lane.train.position.x + (lane.direction? (cellWidth * 0.5) : (trainLength - cellWidth * 0.5));
-                const chickenLeftEdge = chicken.model.position.x - cellWidth/2 * 0.2;
-                const chickenRightEdge = chicken.model.position.x + cellWidth/2 * 0.2;
-                if(chickenRightEdge > trainLeftEdge && chickenLeftEdge < trainRightEdge && chicken.getLane() == lane.index){
-                    if (!gameOver){
+                const trainLeftEdge = lane.train.position.x + (lane.direction ? -(trainLength - cellWidth * 0.5) : -(cellWidth * 0.5));
+                const trainRightEdge = lane.train.position.x + (lane.direction ? (cellWidth * 0.5) : (trainLength - cellWidth * 0.5));
+                const chickenLeftEdge = chicken.model.position.x - cellWidth / 2 * 0.2;
+                const chickenRightEdge = chicken.model.position.x + cellWidth / 2 * 0.2;
+                if (chickenRightEdge > trainLeftEdge && chickenLeftEdge < trainRightEdge && chicken.getLane() == lane.index) {
+                    if (!gameOver) {
                         chicken.shred();
                         chicken.model.visible = false;
                         gameSounds.themeSong.setVolume(0);
@@ -1234,20 +1385,22 @@ const update = () => {
                         gameOver = true;
                         setTimeout(() => {
                             document.getElementById("restart").style.visibility = "visible";
-                            // if (confirm("Game Over.\nRestart?"))
-                            //     init();
                         }, 5000);
+                        Chicken.questionAskedLane = -1
+            updateHighScore(chicken.currentLane); 
+                        
                     }
                 }
             }
-            // Show notification if chicken is on grass
-            else if (lane.type == 'field' || lane.type == 'forest'){
-                showNotification('Chicken is touching grass!');
+            // Show notification if chicken is on grass and no question has been asked for the current lane
+            else if ((lane.type == 'field' || lane.type == 'forest') && chicken.getLane() !== chicken.questionAskedLane) {
+                showNotification();
+                chicken.questionAskedLane = chicken.getLane();
             }
         });
 
-        // Hide notification if the chicken is not on a grass lane
-        if (lanes[chicken.getLane()] && lanes[chicken.getLane()].type !== 'field' && lanes[chicken.getLane()].type !== 'forest') {
+        // Hide notification if the chicken is not on a grass lane or the question has already been asked for the current lane
+        if (lanes[chicken.getLane()] && (lanes[chicken.getLane()].type !== 'field' && lanes[chicken.getLane()].type !== 'forest')) {
             hideNotification();
         }
     }
@@ -1256,6 +1409,7 @@ const update = () => {
     stats.end();
     requestAnimationFrame(update);
 }
+
 
 
 //resize
