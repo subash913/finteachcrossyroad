@@ -11,6 +11,7 @@ let chicken;
 let lanes;
 let gameSounds, themeSong;
 let gameOver;
+let currentQuestionIndex = -1;
 
 const updateHighScore = (currentScore) => {
     let highScore = parseInt(localStorage.getItem('highScore'));
@@ -20,14 +21,13 @@ const updateHighScore = (currentScore) => {
     }
 }
 
-let currentQuestionIndex = -1;
-
 const initializeHighScore = () => {
     if (localStorage.getItem('highScore') === null) {
         localStorage.setItem('highScore', '0');
     }
     document.getElementById("highScore").innerText = "HIGH SCORE:" + localStorage.getItem('highScore');
 }
+
 
 document.addEventListener('keydown', handleKeyPress);
 function handleKeyPress(event) {
@@ -1267,6 +1267,9 @@ const update = () => {
         // makes camera follow player
         camera.position.x = chicken.model.position.x + cameraOffsetX;
         camera.position.z = chicken.model.position.z + cameraOffsetZ;
+
+        // Continuously update the high score
+        updateHighScore(chicken.currentLane);
     }
 
     if (lanes) {
@@ -1295,7 +1298,6 @@ const update = () => {
                                 document.getElementById("restart").style.visibility = "visible";
                             }, 2000);
                             Chicken.questionAskedLane = -1
-            updateHighScore(chicken.currentLane); 
                         }
                     }
                 });
@@ -1322,7 +1324,6 @@ const update = () => {
                                 document.getElementById("restart").style.visibility = "visible";
                             }, 3000);
                             Chicken.questionAskedLane = -1
-            updateHighScore(chicken.currentLane); 
                         }
                     }
                 });
@@ -1361,7 +1362,6 @@ const update = () => {
                             document.getElementById("restart").style.visibility = "visible";
                         }, 2000);
                         Chicken.questionAskedLane = -1
-            updateHighScore(chicken.currentLane); 
                     }
                 }
             } else if (lane.type == 'rail') {
@@ -1387,8 +1387,6 @@ const update = () => {
                             document.getElementById("restart").style.visibility = "visible";
                         }, 5000);
                         Chicken.questionAskedLane = -1
-            updateHighScore(chicken.currentLane); 
-                        
                     }
                 }
             }
@@ -1409,6 +1407,7 @@ const update = () => {
     stats.end();
     requestAnimationFrame(update);
 }
+
 
 
 
